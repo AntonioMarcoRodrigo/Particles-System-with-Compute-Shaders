@@ -1,0 +1,6 @@
+1) Instal Synthclipse
+	http://synthclipse.sourceforge.net/
+	
+2) In Synthclipse open: src/compute.jsx
+
+3) Execute and observe results
