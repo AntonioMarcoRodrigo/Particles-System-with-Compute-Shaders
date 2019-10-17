@@ -1,0 +1,115 @@
+#version 430 core
+
+
+
+layout (std140, binding = 4) buffer Pos
+{
+	vec4 Positions[];
+};
+
+layout (std140, binding = 5) buffer Vel
+{
+	vec4 Velocities[];
+};
+
+layout (std140, binding = 6) buffer Lifetime
+{
+	vec4 LifeTimes[];
+};
+
+layout (std140, binding = 7) buffer MaxLifetime
+{
+	vec4 MaxLifeTimes[];
+};
+
+layout (std140, binding = 8) buffer initPos
+{
+	vec4 InitPositions[];
+};
+
+layout (std140, binding = 9) buffer initVel
+{
+	vec4 InitVelocities[];
+};
+
+layout (std140, binding = 10) buffer atractor
+{
+	vec4 Atractors[];
+};
+
+
+layout (local_size_x = 128, local_size_y = 1, local_size_z = 1) in;
+
+
+uint gid = gl_GlobalInvocationID.x;
+
+int atractor_num = Atractors.length();
+
+const vec4 SPHERE = vec4(10.0,-5.0,0.0,5.0);
+
+vec3 Bounce(vec3 vin, vec3 n)
+{
+	vec3 vout = reflect(vin,n);
+	return vout;
+}
+
+vec3 BounceSphere(vec3 p, vec3 v, vec4 s)
+{
+	vec3 n = normalize(p-s.xyz);
+	return Bounce(v,n);
+}
+bool IsInsideSphere(vec3 p, vec4 s)
+{
+	float r = length(p-s.xyz);
+	return (r<s.w);
+}
+
+vec3 AtractorForce(vec3 atractorPos, float atractorK, vec3 particlePos)
+{
+	vec3 d = atractorPos - particlePos;
+	return atractorK / length(d) * normalize(d);
+}
+
+vec3 atractorPos = vec3(0.0, 0.0, 0.0);
+float K = 10.0;
+
+void main(){
+	vec3 p = Positions[gid].xyz;
+	vec3 v = Velocities[gid].xyz;
+	vec3 F = vec3(0.0,0.0,0.0);
+	const vec3 G = vec3(0,-0.1,0.0);
+	F+=G;
+
+	for(int i=0;i<atractor_num;i++)
+	{
+
+		F+=AtractorForce(vec3(Atractors[i].x, Atractors[i].y,Atractors[i].z),Atractors[i].w,p);
+	}
+
+
+	const float DT = 0.1;
+	vec3 pp = p + v*DT+0.5*DT*DT*F;
+	vec3 vp = v+F*DT;
+	
+
+	LifeTimes[gid] +=DT;
+	if(LifeTimes[gid].x> MaxLifeTimes[gid].x)
+	{
+		LifeTimes[gid].x = 0.0;
+		Positions[gid] = InitPositions[gid];
+		Velocities[gid] = InitVelocities[gid];
+	}
+	else
+	{
+		if(IsInsideSphere(pp, SPHERE))
+		{
+			vp = BounceSphere(p,v, SPHERE);
+			pp = p+vp*DT+0.5*DT*DT*G;
+		}
+		Positions[gid].xyz = pp;
+		Velocities[gid].xyz = vp;
+
+	}
+}
+
+
